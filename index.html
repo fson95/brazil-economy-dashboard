@@ -517,7 +517,8 @@ async function update() {
   btn.disabled = true; $('toast').textContent = '';
   const queue = [...ids];
   const worker = async () => { for (let id; (id = queue.shift());) {
-    try { const next = await fetchSeries(id); added += next.length - raw[id].length; raw[id] = next; } catch (e) { failed.push(BY_ID[id].name); }
+    try { const next = await fetchSeries(id).catch(() => new Promise(r => setTimeout(r, 1200)).then(() => fetchSeries(id)));   // BCB drops the odd request; retry once
+      added += next.length - raw[id].length; raw[id] = next; } catch (e) { failed.push(BY_ID[id].name); }
     $('update-label').textContent = `Updating ${++done}/${ids.length}`;
   } };
   await Promise.all([worker(), worker(), worker(), worker()]);
