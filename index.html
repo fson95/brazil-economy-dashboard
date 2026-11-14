@@ -80,6 +80,7 @@ button, summary { touch-action: manipulation; -webkit-user-select: none; user-se
 .thumb.ready { transition: transform .3s var(--ease), width .3s var(--ease), opacity .15s; }
 .draw { stroke-dasharray: 1; animation: draw .75s var(--ease) backwards; }   /* line traces left to right when new data is shown */
 @keyframes draw { from { stroke-dashoffset: 1; } }
+.draw ~ .end { animation: fade .3s .55s backwards; }   /* the latest-point dot lands as the line finishes */
 .swap { animation: swap .32s var(--ease); }                                  /* headline comes into focus when the indicator changes */
 @keyframes swap { from { opacity: 0; filter: blur(5px); } }
 .dot.pulse { animation: pulse 1s ease-out; }                                 /* one ring when an update lands */
@@ -100,6 +101,7 @@ main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); g
 @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 22px; }
 #focus { position: sticky; top: 68px; scroll-margin-top: 68px; }
+.sheetbar, #scrim, #presets [data-k="Custom"] { display: none; }   /* phone-only pieces */
 @media (max-width: 960px) { #focus { position: static; } }
 #f-name { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; margin: 0 0 2px; text-wrap: balance; }
 .nw { white-space: nowrap; }
@@ -160,23 +162,60 @@ th { color: var(--text-2); font-weight: 500; }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 input, select { caret-color: var(--accent); accent-color: var(--accent); }
 @media (max-width: 700px) {
-  .bar { position: static; }                       /* three rows of controls would eat a phone screen if pinned */
+  /* Phone: the indicator list is the home screen; the chart opens over it as a sheet. */
+  .bar { position: static; border-bottom: 0; }
   .seg::after { content: ""; flex: 0 0 16px; }      /* so the edge fade never sits on the last option */
   .seg { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent); }
   #modes { -webkit-mask-image: none; mask-image: none; } #modes::after { content: none; }
-  .dates { margin-left: 0; width: 100%; } .dates input { flex: 1; min-width: 0; }
-  #focus { scroll-margin-top: 12px; }
+  #presets [data-k="Custom"] { display: block; }
+  .dates { display: none; margin-left: 0; width: 100%; } .dates input { flex: 1; min-width: 0; }
+  .bar.custom .dates { display: flex; }
   header.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: calc(18px + env(safe-area-inset-top)) 0 12px; align-items: center; }
   header.top > div { display: contents; }
   h1 { font-size: 1.625rem; grid-area: 1 / 1; }
   header.top .btn { grid-area: 1 / 2; padding: 0 16px; font-size: .875rem; }
   .fresh { grid-area: 2 / 1 / 3 / 3; margin-top: 2px; font-size: .8125rem; }
-  main { padding: 14px 0 32px; gap: 14px; }
-  .card .n { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; }
-  .card .m .sep { display: none; } .card .m .nw { display: block; }
+  main { display: block; padding: 4px 0 28px; }
   footer { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
-  #cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .panel { padding: 18px; }
+
+  #cards { display: block; }
+  .cat { margin: 22px 4px 8px; }
+  .cat:first-child { margin-top: 10px; }
+  .card {
+    display: grid; grid-template-columns: minmax(0, 1fr) 60px minmax(88px, auto); grid-template-areas: "n s v" "m s d"; column-gap: 12px; row-gap: 1px; align-items: center;
+    width: 100%; min-height: 62px; padding: 10px 14px; border-radius: 0; box-shadow: none; position: relative; transition: background .15s;
+  }
+  .card + .card::before { content: ""; position: absolute; left: 14px; right: 0; top: 0; border-top: 1px solid var(--hairline); }
+  .cat + .card { border-radius: 14px 14px 0 0; }
+  .card:has(+ .cat), .card:last-child { border-radius: 0 0 14px 14px; }
+  .card[aria-pressed="true"] { box-shadow: none; }
+  .card:active { transform: none; background: var(--surface-2); }
+  .card .n { grid-area: n; align-self: end; font-size: .9375rem; line-height: 1.2; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .card .m { display: contents; }
+  .card .m .sep { display: none; }
+  .card .m .dt { grid-area: m; align-self: start; }
+  .card .m .d { grid-area: d; align-self: start; text-align: right; }
+  .card .v { grid-area: v; align-self: end; text-align: right; font-size: 1.0625rem; letter-spacing: -0.01em; white-space: nowrap; }
+  .card > svg, .card .nodata { grid-area: s; margin: 0; height: 30px; }
+  .card .nodata { visibility: hidden; }
+
+  #focus {
+    position: fixed; inset: 0; top: calc(env(safe-area-inset-top) + 10px); z-index: 20; border-radius: 22px 22px 0 0; padding: 0 18px calc(28px + env(safe-area-inset-bottom));
+    overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 -10px 40px rgba(0,0,0,.28);
+    transform: translateY(100%); visibility: hidden; transition: transform .32s cubic-bezier(.4, 0, 1, 1), visibility 0s .32s;
+  }
+  body.sheet #focus { transform: none; visibility: visible; transition: transform .46s var(--ease); }
+  #scrim { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,.42); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  body.sheet #scrim { opacity: 1; pointer-events: auto; }
+  .sheetbar { display: flex; justify-content: flex-end; align-items: center; position: sticky; top: 0; z-index: 3; margin: 0 -18px 4px; padding: 14px 10px 2px; background: var(--surface); }
+  .sheetbar::before { content: ""; position: absolute; left: 50%; top: 7px; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--surface-2); }
+  #done { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 1.0625rem; min-height: 44px; padding: 0 10px; cursor: pointer; }
+  #focus #presets { width: 100%; } #focus #presets [data-k="Custom"] { display: none; }
+  #focus .controls { margin-top: 14px; }
+}
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  #focus { transform: none; opacity: 0; transition: opacity .2s, visibility 0s .2s; }
+  body.sheet #focus { opacity: 1; transition: opacity .2s; }
 }
 footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
 #toast { color: var(--text-2); font-size: .8125rem; }
@@ -217,9 +256,11 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
   <label class="dates">From <input type="date" id="from"> to <input type="date" id="to"></label>
 </div></div>
 
+<div id="scrim"></div>
 <div class="wrap">
   <main>
     <section class="panel" id="focus" aria-label="Selected indicator">
+      <div class="sheetbar"><button id="done">Done</button></div>
       <h2 id="f-name"></h2>
       <div class="hero"><span class="num" id="f-val"></span><span class="unit" id="f-unit"></span></div>
       <div class="sub" id="f-sub"></div>
@@ -271,7 +312,7 @@ const META = [
 ].map(([id, name, cat, unit, freq, kind, dec, scale]) => ({ id, name, cat, unit, freq, kind, dec, scale }));
 const BY_ID = Object.fromEntries(META.map(m => [m.id, m]));
 const CATS = ['All', ...new Set(META.map(m => m.cat))];
-const PRESETS = [['1M', 1], ['3M', 3], ['6M', 6], ['YTD', 'ytd'], ['1Y', 12], ['3Y', 36], ['5Y', 60], ['10Y', 120], ['Max', 0]]; // months back
+const PRESETS = [['1M', 1], ['3M', 3], ['6M', 6], ['YTD', 'ytd'], ['1Y', 12], ['3Y', 36], ['5Y', 60], ['10Y', 120], ['Max', 0], ['Custom', 'custom']]; // months back; Custom (phone only) reveals the date fields
 const MODES = [['level', 'Level'], ['yoy', 'YoY change'], ['index', 'Index = 100']];
 // CMN inflation targets: [first year, centre, tolerance]
 const TARGETS = [[2010, 4.5, 2], [2017, 4.5, 1.5], [2019, 4.25, 1.5], [2020, 4, 1.5], [2021, 3.75, 1.5], [2022, 3.5, 1.5], [2023, 3.25, 1.5], [2024, 3, 1.5]];
@@ -375,7 +416,7 @@ function pathOf(d, v, X, Y) {
 }
 const charts = [];                       // live chart handles for the synced crosshair
 function drawChart(host, s, color, dec, band, anim) {
-  const W = host.clientWidth || 600, H = 240, L = 8, R = 46, T = 10, B = 22;
+  const W = host.clientWidth || 600, H = W > 560 ? 300 : 220, L = 8, R = 46, T = 10, B = 22;
   if (!s.d.length) { host.innerHTML = '<p class="sub">No observations in this date range.</p>'; return null; }
   let lo = Math.min(...s.v), hi = Math.max(...s.v);
   if (band) for (const [, c, tol] of band) { lo = Math.min(lo, c - tol); hi = Math.max(hi, c + tol); }
@@ -400,6 +441,7 @@ function drawChart(host, s, color, dec, band, anim) {
   host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Line chart">${g}
     <path d="${pathOf(s.d, s.v, X, Y)}" ${anim ? 'class="draw" pathLength="1"' : ''} fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${s.d.length === 1 ? `<circle cx="${X(s.d[0])}" cy="${Y(s.v[0])}" r="4" fill="${color}"/>` : ''}
+    ${s.d.length > 1 ? `<circle class="end" cx="${X(s.d[s.d.length - 1])}" cy="${Y(s.v[s.v.length - 1])}" r="3.5" fill="${color}" stroke="var(--surface)" stroke-width="2"/>` : ''}
     <g class="x" style="display:none"><line y1="${T}" y2="${H - B}" stroke="var(--text-2)" stroke-dasharray="3 3"/><circle r="4.5" fill="${color}" stroke="var(--surface)" stroke-width="2"/></g>
     </svg><div class="tip"></div>`;
   const xg = host.querySelector('.x'), tip = host.querySelector('.tip');
@@ -441,7 +483,7 @@ function segmented(host, items, get, set) {
 let syncSegs = [], booting = true, sparkN = 0, lastSel = state.sel, lastW = 0;
 function dataEnd() { return Math.max(...Object.values(S).map(s => s.d[s.d.length - 1])); }
 function applyPreset() {
-  if (!state.preset) return;
+  if (!state.preset || state.preset === 'Custom') return;
   const mo = PRESETS.find(p => p[0] === state.preset)[1]; state.to = dataEnd();
   if (mo === 'ytd') state.from = Date.UTC(new Date(state.to).getUTCFullYear(), 0, 1);
   else if (mo) { const d = new Date(state.to); d.setUTCMonth(d.getUTCMonth() - mo); state.from = +d; }
@@ -462,7 +504,7 @@ function renderCards() {
     html += `<button class="card" data-id="${m.id}" aria-pressed="${m.id === state.sel}">
       <span class="n" title="${m.name}">${m.name}</span>
       <span class="v">${fmt(c.last, m.dec)}<small>${m.unit}</small></span>
-      <span class="m"><span class="nw">${fmtDate(c.date, m.freq)}</span>${c.yoy == null ? '' : `<span class="sep"> · </span><span class="nw">${signed(c.yoy, dd)}${c.u} vs 1y</span>`}</span>
+      <span class="m"><span class="nw dt">${fmtDate(c.date, m.freq)}</span>${c.yoy == null ? '' : `<span class="sep"> · </span><span class="nw d">${signed(c.yoy, dd)}${c.u} vs 1y</span>`}</span>
       ${spark(w)}</button>`;
   }
   $('cards').innerHTML = html;
@@ -510,8 +552,28 @@ function renderFocus(anim = true) {
 function render() {
   applyPreset();
   $('from').value = iso(state.from); $('to').value = iso(state.to);
+  document.querySelector('.bar').classList.toggle('custom', state.preset === 'Custom');
   syncSegs.forEach(f => f());
   renderHeader(); renderCards(); renderFocus();
+}
+
+// ---------- phone sheet ----------
+const isPhone = () => matchMedia('(max-width: 700px)').matches;
+function openSheet() {
+  if (document.body.classList.contains('sheet')) return;
+  document.querySelector('#focus .controls').prepend($('presets'));   // the time range travels into the sheet with the chart
+  document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
+  $('focus').setAttribute('role', 'dialog'); $('focus').setAttribute('aria-modal', 'true'); $('focus').scrollTop = 0;
+  history.pushState({ sheet: true }, ''); syncSegs.forEach(f => f()); $('done').focus({ preventScroll: true });
+}
+function closeSheet(fromBack) {
+  if (!document.body.classList.contains('sheet')) return;
+  $('cats').after($('presets'));
+  document.body.classList.remove('sheet'); document.documentElement.style.overflow = '';
+  $('focus').removeAttribute('role'); $('focus').removeAttribute('aria-modal');
+  if (!fromBack && history.state && history.state.sheet) history.back();
+  syncSegs.forEach(f => f());
+  const card = document.querySelector(`.card[data-id="${state.sel}"]`); if (card) card.focus({ preventScroll: true });
 }
 
 // ---------- live update from BCB ----------
@@ -560,12 +622,15 @@ function boot() {
     segmented($('presets'), PRESETS.map(p => [p[0], p[0]]), () => state.preset, k => state.preset = k),
     segmented($('modes'), MODES, () => state.mode, k => state.mode = k),
   ];
-  const onDate = () => { const f = parseIso($('from').value), t = parseIso($('to').value); if (isFinite(f) && isFinite(t) && f < t) { state.from = f; state.to = t; state.preset = ''; render(); } };
+  const onDate = () => { const f = parseIso($('from').value), t = parseIso($('to').value); if (isFinite(f) && isFinite(t) && f < t) { state.from = f; state.to = t; state.preset = 'Custom'; render(); } };
   $('from').addEventListener('change', onDate); $('to').addEventListener('change', onDate);
   $('smooth').addEventListener('input', e => { state.smooth = +e.target.value; renderFocus(false); });   // no redraw animation while dragging
   $('compare').addEventListener('change', e => { state.compare = e.target.value; renderFocus(); });
   $('cards').addEventListener('click', e => { const b = e.target.closest('.card'); if (!b) return; state.sel = b.dataset.id; render();
-    if (matchMedia('(max-width: 960px)').matches) $('focus').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
+    if (isPhone()) openSheet(); else if (matchMedia('(max-width: 960px)').matches) $('focus').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
+  $('done').addEventListener('click', () => closeSheet()); $('scrim').addEventListener('click', () => closeSheet());
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+  addEventListener('popstate', () => closeSheet(true));   // the phone's back gesture closes the sheet
   $('update').addEventListener('click', update);
   for (const id of ['chart1', 'chart2']) {
     $(id).addEventListener('pointermove', e => { const c = charts[0]; if (!c) return;
@@ -574,7 +639,7 @@ function boot() {
     $(id).addEventListener('pointerleave', () => charts.forEach(ch => ch.hide()));
   }
   new ResizeObserver(() => { if (lastW && $('chart1').clientWidth !== lastW) renderFocus(false); }).observe($('chart1'));
-  const resync = () => syncSegs.forEach(f => f());
+  const resync = () => { if (!isPhone()) closeSheet(); syncSegs.forEach(f => f()); };
   addEventListener('resize', resync); document.fonts.ready.then(resync);   // pill position depends on text width
   render(); booting = false;
 }
