@@ -101,7 +101,7 @@ main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); g
 @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 22px; }
 #focus { position: sticky; top: 68px; scroll-margin-top: 68px; }
-.sheetbar, #scrim, #presets [data-k="Custom"] { display: none; }   /* phone-only pieces */
+.sheetbar, #scrim, #presets2, #presets [data-k="Custom"] { display: none; }   /* phone-only pieces */
 @media (max-width: 960px) { #focus { position: static; } }
 #f-name { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; margin: 0 0 2px; text-wrap: balance; }
 .nw { white-space: nowrap; }
@@ -210,7 +210,7 @@ input, select { caret-color: var(--accent); accent-color: var(--accent); }
   .sheetbar { display: flex; justify-content: flex-end; align-items: center; position: sticky; top: 0; z-index: 3; margin: 0 -18px 4px; padding: 14px 10px 2px; background: var(--surface); }
   .sheetbar::before { content: ""; position: absolute; left: 50%; top: 7px; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--surface-2); }
   #done { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 1.0625rem; min-height: 44px; padding: 0 10px; cursor: pointer; }
-  #focus #presets { width: 100%; } #focus #presets [data-k="Custom"] { display: none; }
+  #presets2 { display: inline-flex; width: 100%; }   /* the sheet has its own copy of the range strip, so the one on the home screen never moves */
   #focus .controls { margin-top: 14px; }
 }
 @media (max-width: 700px) and (prefers-reduced-motion: reduce) {
@@ -265,6 +265,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
       <div class="hero"><span class="num" id="f-val"></span><span class="unit" id="f-unit"></span></div>
       <div class="sub" id="f-sub"></div>
       <div class="controls">
+        <div class="seg" id="presets2" role="group" aria-label="Time range"></div>
         <div class="seg" id="modes" role="group" aria-label="Transform"></div>
         <label class="field">Smoothing <input type="range" id="smooth" min="1" max="12" value="1"><output id="smooth-out"></output></label>
         <label class="field">Compare <select id="compare"></select></label>
@@ -561,20 +562,14 @@ function render() {
 const isPhone = () => matchMedia('(max-width: 700px)').matches;
 function openSheet() {
   if (document.body.classList.contains('sheet')) return;
-  document.querySelector('#focus .controls').prepend($('presets'));   // the time range travels into the sheet with the chart
   document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
   $('focus').setAttribute('role', 'dialog'); $('focus').setAttribute('aria-modal', 'true'); $('focus').scrollTop = 0;
-  history.pushState({ sheet: true }, ''); syncSegs.forEach(f => f()); $('done').focus({ preventScroll: true });
+  syncSegs.forEach(f => f()); $('done').focus({ preventScroll: true });
 }
-function closeSheet(fromBack) {
+function closeSheet() {
   if (!document.body.classList.contains('sheet')) return;
-  $('cats').after($('presets'));
-  // iOS already animates the swipe-back itself; a second slide-down afterwards reads as the sheet reappearing, so close instantly then.
-  if (fromBack) { $('focus').style.transition = $('scrim').style.transition = 'none'; }
   document.body.classList.remove('sheet'); document.documentElement.style.overflow = '';
-  if (fromBack) { void $('focus').offsetWidth; $('focus').style.transition = $('scrim').style.transition = ''; }
   $('focus').removeAttribute('role'); $('focus').removeAttribute('aria-modal');
-  if (!fromBack && history.state && history.state.sheet) history.back();
   syncSegs.forEach(f => f());
   const card = document.querySelector(`.card[data-id="${state.sel}"]`); if (card) card.focus({ preventScroll: true });
 }
@@ -656,7 +651,6 @@ function selfTest() {
 }
 function boot() {
   selfTest();
-  if (history.state && history.state.sheet) history.replaceState(null, '');   // a reload while the sheet was open leaves its marker behind
   for (const [id, obs] of Object.entries(window.SEED.series)) raw[id] = obs.map(([d, v]) => [parseIso(d), v]);
   fetchedAt = window.SEED.fetchedAt;
   try { const saved = JSON.parse(localStorage.getItem(LS_KEY)); if (saved && saved.fetchedAt > new Date(fetchedAt).toISOString()) { Object.assign(raw, saved.raw); fetchedAt = saved.fetchedAt; live = true; } } catch (e) {}
@@ -664,6 +658,7 @@ function boot() {
   syncSegs = [
     segmented($('cats'), CATS.map(c => [c, c]), () => state.cat, k => state.cat = k),
     segmented($('presets'), PRESETS.map(p => [p[0], p[0]]), () => state.preset, k => state.preset = k),
+    segmented($('presets2'), PRESETS.filter(p => p[0] !== 'Custom').map(p => [p[0], p[0]]), () => state.preset, k => state.preset = k),
     segmented($('modes'), MODES, () => state.mode, k => state.mode = k),
   ];
   const onDate = () => { const f = parseIso($('from').value), t = parseIso($('to').value); if (isFinite(f) && isFinite(t) && f < t) { state.from = f; state.to = t; state.preset = 'Custom'; render(); } };
@@ -674,7 +669,6 @@ function boot() {
     if (isPhone()) openSheet(); else if (matchMedia('(max-width: 960px)').matches) $('focus').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
   $('done').addEventListener('click', () => closeSheet()); $('scrim').addEventListener('click', () => closeSheet());
   addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
-  addEventListener('popstate', () => closeSheet(true));   // the phone's back gesture closes the sheet
   $('update').addEventListener('click', update);
   for (const id of ['chart1', 'chart2']) {
     $(id).addEventListener('pointermove', e => { const c = charts[0]; if (!c) return;
