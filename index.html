@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Brazil Economy</title>
+<title>Economic Data</title>
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Brazil Economy">
+<meta name="apple-mobile-web-app-title" content="Economic Data">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="color-scheme" content="light dark">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -19,7 +19,7 @@
   color-scheme: light dark;
   --bg: #f5f5f7; --surface: #ffffff; --surface-2: #e8e8ed; --bar: rgba(245,245,247,.72);
   --text: #1d1d1f; --text-2: #6e6e73; --hairline: rgba(0,0,0,.1); --grid: rgba(0,0,0,.08);
-  --accent: #0071e3; --series-1: #2a78d6; --series-2: #eb6834; --band: rgba(42,120,214,.12);
+  --accent: #0071e3; --blue: #2a78d6; --green: #079142; --series-1: var(--blue); --series-2: #eb6834; --band: rgba(42,120,214,.12);
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   --ease: cubic-bezier(.16, 1, .3, 1);
 }
@@ -27,10 +27,13 @@
   :root {
     --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --bar: rgba(0,0,0,.72);
     --text: #f5f5f7; --text-2: #a1a1a6; --hairline: rgba(255,255,255,.14); --grid: rgba(255,255,255,.1);
-    --accent: #2997ff; --series-1: #3987e5; --series-2: #d95926; --band: rgba(57,135,229,.18);
+    --accent: #2997ff; --blue: #3987e5; --green: #1fa04e; --series-1: var(--blue); --series-2: #d95926; --band: rgba(57,135,229,.18);
     --shadow: none;
   }
 }
+/* United States charts: the Brazil blue turned to green at the same lightness and intensity. Orange and green are hard to
+   tell apart with red-green colour blindness, so the comparison series there is the blue instead. */
+body[data-country="US"] { --series-1: var(--green); --series-2: var(--blue); }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 body {
@@ -247,7 +250,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>Brazil Economy</h1>
+      <h1>Economic Data</h1>
       <div class="fresh" aria-live="polite">
         <span><span class="dot" id="dot"></span>Data through <b id="through">–</b></span>
         <span>Last updated <b id="fetched">–</b> <span id="origin"></span></span>
@@ -597,6 +600,7 @@ function render() {
   applyPreset();
   $('from').value = iso(state.from); $('to').value = iso(state.to);
   document.querySelector('.bar').classList.toggle('custom', state.preset === 'Custom');
+  document.body.dataset.country = state.country;
   $('cats').querySelectorAll('button').forEach(b => { b.hidden = b.dataset.k !== 'All' && !META.some(m => m.cat === b.dataset.k && m.c === state.country && S[m.id]); });
   syncSegs.forEach(f => f());
   renderHeader(); renderCards(); renderFocus();
@@ -696,8 +700,8 @@ function selfTest() {
 function boot() {
   selfTest();
   for (const [id, obs] of Object.entries(window.SEED.series)) raw[id] = obs.map(([d, v]) => [parseIso(d), v]);
-  if (window.SEED_US) { hasUS = true; usFetchedAt = window.SEED_US.fetchedAt;
-    for (const [id, obs] of Object.entries(window.SEED_US.series)) if (BY_ID[id]) raw[id] = obs.map(([d, v]) => [parseIso(d), v]); }
+  if (window.SEED_US) { usFetchedAt = window.SEED_US.fetchedAt;   // an empty snapshot must not switch the US tab on
+    for (const [id, obs] of Object.entries(window.SEED_US.series)) if (BY_ID[id] && obs.length) { raw[id] = obs.map(([d, v]) => [parseIso(d), v]); hasUS = true; } }
   fetchedAt = window.SEED.fetchedAt;
   try { const saved = JSON.parse(localStorage.getItem(LS_KEY)); if (saved && saved.fetchedAt > new Date(fetchedAt).toISOString()) { for (const id in saved.raw) if (BY_ID[id] && BY_ID[id].c === 'BR') raw[id] = saved.raw[id]; fetchedAt = saved.fetchedAt; live = true; } } catch (e) {}
   build();
