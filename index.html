@@ -569,7 +569,10 @@ function openSheet() {
 function closeSheet(fromBack) {
   if (!document.body.classList.contains('sheet')) return;
   $('cats').after($('presets'));
+  // iOS already animates the swipe-back itself; a second slide-down afterwards reads as the sheet reappearing, so close instantly then.
+  if (fromBack) { $('focus').style.transition = $('scrim').style.transition = 'none'; }
   document.body.classList.remove('sheet'); document.documentElement.style.overflow = '';
+  if (fromBack) { void $('focus').offsetWidth; $('focus').style.transition = $('scrim').style.transition = ''; }
   $('focus').removeAttribute('role'); $('focus').removeAttribute('aria-modal');
   if (!fromBack && history.state && history.state.sheet) history.back();
   syncSegs.forEach(f => f());
