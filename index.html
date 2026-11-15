@@ -47,6 +47,7 @@ h1 { font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1.05; letter-spacing: -0
 .dot.live { background: #1baf7a; }
 
 button, select, input { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
 button, summary { touch-action: manipulation; -webkit-user-select: none; user-select: none; }  /* no double-tap delay, no text selection on long-press */
 .btn {
   border: 0; border-radius: 980px; background: #0071e3; color: #fff; /* fixed blue: white text stays above 4.5:1 in both themes */ font-weight: 600; font-size: .9375rem;
@@ -172,7 +173,7 @@ input, select { caret-color: var(--accent); accent-color: var(--accent); }
   .bar { position: static; border-bottom: 0; }
   .seg::after { content: ""; flex: 0 0 16px; }      /* so the edge fade never sits on the last option */
   .seg { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent); }
-  #modes { -webkit-mask-image: none; mask-image: none; } #modes::after { content: none; }
+  #modes, #country { -webkit-mask-image: none; mask-image: none; } #modes::after, #country::after { content: none; }
   #presets [data-k="Custom"] { display: block; }
   .dates { display: none; margin-left: 0; width: 100%; } .dates input { flex: 1; min-width: 0; }
   .bar.custom .dates { display: flex; }
@@ -258,6 +259,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
 </div>
 
 <div class="bar"><div class="wrap">
+  <div class="seg" id="country" role="group" aria-label="Country" hidden></div>
   <div class="seg" id="cats" role="group" aria-label="Category"></div>
   <div class="seg" id="presets" role="group" aria-label="Time range"></div>
   <label class="dates">From <input type="date" id="from"> to <input type="date" id="to"></label>
@@ -285,10 +287,11 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
     </section>
     <section id="cards" aria-label="Indicators"></section>
   </main>
-  <footer>Source: Banco Central do Brasil, SGS time series (api.bcb.gov.br), including series BCB republishes from IBGE, FGV and Copom. Real interest rate is derived: (1 + Selic target) / (1 + IPCA 12-month) − 1. Arrows show direction only, not whether a move is good or bad.</footer>
+  <footer>Source: Banco Central do Brasil, SGS time series (api.bcb.gov.br), including series BCB republishes from IBGE, FGV and Copom. Real interest rate is derived: (1 + Selic target) / (1 + IPCA 12-month) − 1. United States series come from FRED and refresh once a day; this product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Arrows show direction only, not whether a move is good or bad.</footer>
 </div>
 
 <script src="data.js"></script>
+<script src="data-us.js"></script><!-- written daily by .github/workflows/refresh-us-data.yml; the page works without it -->
 <script>
 'use strict';
 const DAY = 864e5;
@@ -317,7 +320,34 @@ const META = [
   ['20539', 'Credit outstanding',        'Credit',         'R$ tn',   'M', 'level', 2, 1e-6],
   ['20714', 'Average lending rate',      'Credit',         '% p.a.',  'M', 'rate',  1, 1],
   ['21082', 'Default rate (90+ days)',   'Credit',         '%',       'M', 'rate',  2, 1],
-].map(([id, name, cat, unit, freq, kind, dec, scale]) => ({ id, name, cat, unit, freq, kind, dec, scale }));
+].map(([id, name, cat, unit, freq, kind, dec, scale]) => ({ id, name, cat, unit, freq, kind, dec, scale, c: 'BR' }));
+// United States, from FRED (ids are FRED series ids). Inflation series arrive from FRED already as % change on a year earlier.
+// Keep in step with SERIES in scripts/fetch_fred.py.
+META.push(...[
+  ['DFEDTARU',      'Fed funds target (upper)',   'Prices & rates', '% p.a.',  'D', 'rate',  2, 1],
+  ['CPIAUCSL',      'CPI inflation, 12-month',    'Prices & rates', '%',       'M', 'rate',  2, 1],
+  ['CPILFESL',      'Core CPI, 12-month',         'Prices & rates', '%',       'M', 'rate',  2, 1],
+  ['PCEPI',         'PCE inflation, 12-month',    'Prices & rates', '%',       'M', 'rate',  2, 1],
+  ['DGS2',          '2-year Treasury yield',      'Prices & rates', '%',       'D', 'rate',  2, 1],
+  ['DGS10',         '10-year Treasury yield',     'Prices & rates', '%',       'D', 'rate',  2, 1],
+  ['MORTGAGE30US',  '30-year mortgage rate',      'Prices & rates', '%',       'W', 'rate',  2, 1],
+  ['DTWEXBGS',      'Broad dollar index',         'External',       'index',   'D', 'level', 1, 1],
+  ['BOPGSTB',       'Trade balance, monthly',     'External',       'US$ bn',  'M', 'flow',  1, 1e-3],
+  ['GDPC1',         'Real GDP, annualised',       'Activity',       'US$ tn',  'Q', 'level', 2, 1e-3],
+  ['INDPRO',        'Industrial production',      'Activity',       'index',   'M', 'level', 1, 1],
+  ['RSAFS',         'Retail sales, monthly',      'Activity',       'US$ bn',  'M', 'level', 1, 1e-3],
+  ['UMCSENT',       'Consumer sentiment',         'Activity',       'index',   'M', 'level', 1, 1],
+  ['UNRATE',        'Unemployment rate',          'Labor',          '%',       'M', 'rate',  1, 1],
+  ['PAYEMS',        'Nonfarm payrolls',           'Labor',          'mn jobs', 'M', 'level', 1, 1e-3],
+  ['CES0500000003', 'Average hourly earnings',    'Labor',          'US$',     'M', 'level', 2, 1],
+  ['ICSA',          'Initial jobless claims',     'Labor',          'thousand','W', 'flow',  0, 1e-3],
+  ['GFDEGDQ188S',   'Federal debt',               'Fiscal',         '% GDP',   'Q', 'rate',  1, 1],
+  ['TOTALSL',       'Consumer credit',            'Credit',         'US$ tn',  'M', 'level', 2, 1e-6],
+  ['DRCCLACBS',     'Credit card delinquency',    'Credit',         '%',       'Q', 'rate',  2, 1],
+  ['SP500',         'S&P 500',                    'Markets',        'index',   'D', 'level', 0, 1],
+  ['VIXCLS',        'VIX volatility index',       'Markets',        'index',   'D', 'level', 1, 1],
+].map(([id, name, cat, unit, freq, kind, dec, scale]) => ({ id, name, cat, unit, freq, kind, dec, scale, c: 'US' })));
+const COUNTRIES = [['BR', 'Brazil'], ['US', 'United States']];
 const BY_ID = Object.fromEntries(META.map(m => [m.id, m]));
 const CATS = ['All', ...new Set(META.map(m => m.cat))];
 const PRESETS = [['1M', 1], ['3M', 3], ['6M', 6], ['YTD', 'ytd'], ['1Y', 12], ['3Y', 36], ['5Y', 60], ['10Y', 120], ['Max', 0], ['Custom', 'custom']]; // months back; Custom (phone only) reveals the date fields
@@ -326,7 +356,8 @@ const MODES = [['level', 'Level'], ['yoy', 'YoY change'], ['index', 'Index = 100
 const TARGETS = [[2010, 4.5, 2], [2017, 4.5, 1.5], [2019, 4.25, 1.5], [2020, 4, 1.5], [2021, 3.75, 1.5], [2022, 3.5, 1.5], [2023, 3.25, 1.5], [2024, 3, 1.5]];
 
 const LS_KEY = 'brazil-economy-v1';
-const state = { cat: 'All', preset: '5Y', from: 0, to: 0, sel: '432', mode: 'level', smooth: 1, compare: '' };
+const state = { country: 'BR', cat: 'All', preset: '5Y', from: 0, to: 0, sel: '432', mode: 'level', smooth: 1, compare: '' };
+let hasUS = false, usFetchedAt = '';
 let raw = {};       // id -> [[ms, value]] sorted, unscaled, straight from BCB
 let S = {};         // id -> {d: [ms], v: [scaled]}
 let fetchedAt = '', live = false;
@@ -500,15 +531,18 @@ function applyPreset() {
   else state.from = Math.min(...Object.values(S).map(s => s.d[0]));
 }
 function renderHeader() {
-  $('through').textContent = fmtDate(dataEnd(), 'D');
-  $('fetched').textContent = fetchedAt ? new Date(fetchedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
-  $('origin').textContent = live ? '· live from BCB' : '· bundled snapshot';
-  $('dot').className = 'dot' + (live ? ' live' : '');
+  const us = state.country === 'US', ends = META.filter(m => m.c === state.country && S[m.id]).map(m => S[m.id].d[S[m.id].d.length - 1]);
+  const when = us ? usFetchedAt : fetchedAt;
+  $('through').textContent = fmtDate(Math.max(...ends), 'D');
+  $('fetched').textContent = when ? new Date(when).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
+  $('origin').textContent = us ? '· refreshed daily from FRED' : live ? '· live from BCB' : '· bundled snapshot';
+  $('dot').className = 'dot' + (us || live ? ' live' : '');
+  $('update').hidden = us;
 }
 function renderCards() {
   let html = '', cat = '';
   for (const m of META) {
-    if (!S[m.id] || (state.cat !== 'All' && m.cat !== state.cat)) continue;
+    if (!S[m.id] || m.c !== state.country || (state.cat !== 'All' && m.cat !== state.cat)) continue;
     if (m.cat !== cat) { cat = m.cat; html += `<h2 class="cat">${cat}</h2>`; }
     const c = changes(m.id), w = windowed(S[m.id], 'level'), dd = Math.max(m.dec, 1) > 2 ? 2 : Math.max(m.dec, 1);
     html += `<button class="card" data-id="${m.id}" aria-pressed="${m.id === state.sel}">
@@ -529,10 +563,10 @@ function renderFocus(anim = true) {
   $('f-val').textContent = fmt(c.last, m.dec); $('f-unit').textContent = m.unit;
   $('f-sub').innerHTML = [`${m.cat}`, `Latest: ${fmtDate(c.date, m.freq)}`,
     c.prev == null ? '' : `${signed(c.prev, dd)}${c.u} vs previous`, c.yoy == null ? '' : `${signed(c.yoy, dd)}${c.u} vs a year earlier`,
-    m.id === 'real' ? 'derived' : `SGS ${m.id}`].filter(Boolean).map(t => `<span class="nw">${t}</span>`).join(' · ');
-  const per = { D: 'obs.', M: 'mo.', Q: 'qtr.' }[m.freq];
+    m.id === 'real' ? 'derived' : m.c === 'US' ? `FRED ${m.id}` : `SGS ${m.id}`].filter(Boolean).map(t => `<span class="nw">${t}</span>`).join(' · ');
+  const per = { D: 'obs.', W: 'wk.', M: 'mo.', Q: 'qtr.' }[m.freq];
   $('smooth-out').textContent = state.smooth === 1 ? 'Off' : `${state.smooth} ${per} avg`;
-  $('compare').innerHTML = '<option value="">None</option>' + META.filter(x => x.id !== m.id && S[x.id]).map(x => `<option value="${x.id}"${x.id === state.compare ? ' selected' : ''}>${x.name}</option>`).join('');
+  $('compare').innerHTML = '<option value="">None</option>' + META.filter(x => x.id !== m.id && S[x.id]).map(x => `<option value="${x.id}"${x.id === state.compare ? ' selected' : ''}>${hasUS ? x.c + ' · ' : ''}${x.name}</option>`).join('');
   if (state.compare === m.id) state.compare = '';
 
   const dec = decFor(m, state.mode), unit = unitFor(m, state.mode), s = windowed(transform(m.id, state.mode, state.smooth), state.mode);
@@ -563,6 +597,7 @@ function render() {
   applyPreset();
   $('from').value = iso(state.from); $('to').value = iso(state.to);
   document.querySelector('.bar').classList.toggle('custom', state.preset === 'Custom');
+  $('cats').querySelectorAll('button').forEach(b => { b.hidden = b.dataset.k !== 'All' && !META.some(m => m.cat === b.dataset.k && m.c === state.country && S[m.id]); });
   syncSegs.forEach(f => f());
   renderHeader(); renderCards(); renderFocus();
 }
@@ -635,7 +670,7 @@ async function fetchSeries(id) {
   return mergeObs(old, add);             // BCB publishes the Selic target ahead of time; future dates are dropped
 }
 async function update() {
-  const btn = $('update'), ids = META.map(m => m.id).filter(id => raw[id]), failed = []; let done = 0, added = 0;
+  const btn = $('update'), ids = META.filter(m => m.c === 'BR' && raw[m.id]).map(m => m.id), failed = [];   // US data comes from the daily FRED job, not the browser let done = 0, added = 0;
   btn.disabled = true; $('toast').textContent = '';
   const queue = [...ids];
   const worker = async () => { for (let id; (id = queue.shift());) {
@@ -647,7 +682,7 @@ async function update() {
   btn.disabled = false; $('update-label').textContent = 'Update data';
   if (failed.length === ids.length) { $('toast').textContent = 'Update failed. Could not reach the BCB API; showing the previous data.'; return; }
   fetchedAt = new Date().toISOString(); live = true; build();
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ fetchedAt, raw })); } catch (e) { /* storage is a convenience only */ }
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ fetchedAt, raw: Object.fromEntries(ids.map(id => [id, raw[id]])) })); } catch (e) { /* storage is a convenience only */ }
   $('toast').textContent = (added ? `${added} new observation${added === 1 ? '' : 's'}.` : 'Already up to date.') + (failed.length ? ` Not updated: ${failed.join(', ')}.` : '');
   render(); $('dot').classList.add('pulse');
 }
@@ -661,10 +696,15 @@ function selfTest() {
 function boot() {
   selfTest();
   for (const [id, obs] of Object.entries(window.SEED.series)) raw[id] = obs.map(([d, v]) => [parseIso(d), v]);
+  if (window.SEED_US) { hasUS = true; usFetchedAt = window.SEED_US.fetchedAt;
+    for (const [id, obs] of Object.entries(window.SEED_US.series)) if (BY_ID[id]) raw[id] = obs.map(([d, v]) => [parseIso(d), v]); }
   fetchedAt = window.SEED.fetchedAt;
-  try { const saved = JSON.parse(localStorage.getItem(LS_KEY)); if (saved && saved.fetchedAt > new Date(fetchedAt).toISOString()) { Object.assign(raw, saved.raw); fetchedAt = saved.fetchedAt; live = true; } } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem(LS_KEY)); if (saved && saved.fetchedAt > new Date(fetchedAt).toISOString()) { for (const id in saved.raw) if (BY_ID[id] && BY_ID[id].c === 'BR') raw[id] = saved.raw[id]; fetchedAt = saved.fetchedAt; live = true; } } catch (e) {}
   build();
+  $('country').hidden = !hasUS;
   syncSegs = [
+    segmented($('country'), COUNTRIES, () => state.country, k => { if (k === state.country) return;
+      state.country = k; state.cat = 'All'; state.compare = ''; state.sel = META.find(m => m.c === k && S[m.id]).id; }),
     segmented($('cats'), CATS.map(c => [c, c]), () => state.cat, k => state.cat = k),
     segmented($('presets'), PRESETS.map(p => [p[0], p[0]]), () => state.preset, k => state.preset = k),
     segmented($('presets2'), PRESETS.filter(p => p[0] !== 'Custom').map(p => [p[0], p[0]]), () => state.preset, k => state.preset = k),
