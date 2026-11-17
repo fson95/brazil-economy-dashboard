@@ -674,7 +674,8 @@ async function fetchSeries(id) {
   return mergeObs(old, add);             // BCB publishes the Selic target ahead of time; future dates are dropped
 }
 async function update() {
-  const btn = $('update'), ids = META.filter(m => m.c === 'BR' && raw[m.id]).map(m => m.id), failed = [];   // US data comes from the daily FRED job, not the browser let done = 0, added = 0;
+  const btn = $('update'), ids = META.filter(m => m.c === 'BR' && raw[m.id]).map(m => m.id), failed = [];   // US data comes from the daily FRED job, not the browser
+  let done = 0, added = 0;
   btn.disabled = true; $('toast').textContent = '';
   const queue = [...ids];
   const worker = async () => { for (let id; (id = queue.shift());) {
