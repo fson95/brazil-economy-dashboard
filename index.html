@@ -19,6 +19,7 @@
   color-scheme: light dark;
   --bg: #f5f5f7; --surface: #ffffff; --surface-2: #e8e8ed; --bar: rgba(245,245,247,.72);
   --text: #1d1d1f; --text-2: #6e6e73; --hairline: rgba(0,0,0,.1); --grid: rgba(0,0,0,.08);
+  --track: #e3e3e8;
   --accent: #0071e3; --blue: #2a78d6; --green: #079142; --series-1: var(--blue); --series-2: #eb6834; --band: rgba(42,120,214,.12);
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   --ease: cubic-bezier(.16, 1, .3, 1);
@@ -28,6 +29,7 @@
   :root {
     --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --bar: rgba(0,0,0,.72);
     --text: #f5f5f7; --text-2: #a1a1a6; --hairline: rgba(255,255,255,.14); --grid: rgba(255,255,255,.1);
+    --track: #3a3a3c;
     --accent: #2997ff; --blue: #3987e5; --green: #1fa04e; --series-1: var(--blue); --series-2: #d95926; --band: rgba(57,135,229,.18);
     --shadow: none;
   }
@@ -123,7 +125,24 @@ main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); g
 .controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin: 18px 0 8px; }
 .field { display: inline-flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--text-2); }
 .field output { color: var(--text); font-variant-numeric: tabular-nums; min-width: 5.5em; }
-input[type=range] { accent-color: var(--accent); width: 130px; min-height: 28px; }
+.field output.off { color: var(--text-2); }
+/* iOS-style slider: thin track, accent fill that ends under the thumb's centre (--f, 0–1, set from JS), white thumb with a soft lift */
+input[type=range] {
+  --t: 22px; --fill: calc(var(--t) / 2 + (100% - var(--t)) * var(--f, 0));
+  -webkit-appearance: none; appearance: none; width: 140px; height: 28px; margin: 0; background: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--fill), var(--track) var(--fill)); }
+input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--track); }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: var(--t); height: var(--t); margin-top: calc(2px - var(--t) / 2); border: 0; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 3px 8px rgba(0,0,0,.16), 0 1px 1px rgba(0,0,0,.08); transition: box-shadow .15s;
+}
+input[type=range]::-moz-range-thumb { width: var(--t); height: var(--t); border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 3px 8px rgba(0,0,0,.16), 0 1px 1px rgba(0,0,0,.08); }
+input[type=range]:focus-visible { outline: none; }
+input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent), 0 3px 8px rgba(0,0,0,.16); }
+input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent), 0 3px 8px rgba(0,0,0,.16); }
+@media (pointer: coarse) { input[type=range] { --t: 28px; height: 44px; } }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8125rem; color: var(--text-2); margin-top: 8px; }
 .sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .sw.band { height: 10px; background: var(--band); }
@@ -225,6 +244,7 @@ input, select { caret-color: var(--accent); accent-color: var(--accent); }
   .sheetbar { display: flex; justify-content: flex-end; align-items: center; position: sticky; top: 0; z-index: 3; margin: 0 -18px 4px; padding: 14px 10px 2px; background: var(--surface); }
   .sheetbar::before { content: ""; position: absolute; left: 50%; top: 7px; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--surface-2); }
   #done { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 1.0625rem; min-height: 44px; padding: 0 10px; cursor: pointer; }
+  .field.slide { flex: 1 1 100%; } .field.slide input { flex: 1; min-width: 0; }   /* full-width slider in the sheet, like iOS */
   #presets2 { display: inline-flex; width: 100%; }   /* the sheet has its own copy of the range strip, so the one on the home screen never moves */
   #focus .controls { margin-top: 14px; }
 }
@@ -244,8 +264,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
   .spin { animation-duration: 2s; }
 }
 @media (pointer: coarse) {
-  .dates input, .field select { font-size: 16px; min-height: 44px; }
-  .dates input { -webkit-appearance: none; appearance: none; text-align: left; }   /* iOS draws date fields as centred grey pills otherwise */
+  .dates input, .field select { font-size: 16px; min-height: 44px; }  .dates input { -webkit-appearance: none; appearance: none; text-align: left; }   /* iOS draws date fields as centred grey pills otherwise */
   input::-webkit-date-and-time-value { text-align: left; }
 }  /* iOS zooms the page when a focused field is under 16px */
 @media (prefers-reduced-transparency: reduce) { .bar { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
@@ -284,7 +303,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
       <div class="controls">
         <div class="seg" id="presets2" role="group" aria-label="Time range"></div>
         <div class="seg" id="modes" role="group" aria-label="Transform"></div>
-        <label class="field">Smoothing <input type="range" id="smooth" min="1" max="12" value="1"><output id="smooth-out"></output></label>
+        <label class="field slide">Smoothing <input type="range" id="smooth" min="1" max="12" value="1"><output id="smooth-out"></output></label>
         <label class="field">Compare <select id="compare"></select></label>
       </div>
       <div class="legend" id="legend"></div>
@@ -574,6 +593,7 @@ function renderFocus(anim = true) {
     m.id === 'real' ? 'derived' : m.c === 'US' ? `FRED ${m.id}` : `SGS ${m.id}`].filter(Boolean).map(t => `<span class="nw">${t}</span>`).join(' · ');
   const per = { D: 'obs.', W: 'wk.', M: 'mo.', Q: 'qtr.' }[m.freq];
   $('smooth-out').textContent = state.smooth === 1 ? 'Off' : `${state.smooth} ${per} avg`;
+  $('smooth-out').classList.toggle('off', state.smooth === 1); $('smooth').style.setProperty('--f', (state.smooth - 1) / 11);
   $('compare').innerHTML = '<option value="">None</option>' + META.filter(x => x.id !== m.id && S[x.id]).map(x => `<option value="${x.id}"${x.id === state.compare ? ' selected' : ''}>${hasUS ? x.c + ' · ' : ''}${x.name}</option>`).join('');
   if (state.compare === m.id) state.compare = '';
 
