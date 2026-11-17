@@ -86,12 +86,15 @@ button, summary { touch-action: manipulation; -webkit-user-select: none; user-se
 .thumb.ready { transition: transform .43s var(--spring), width .43s var(--spring), opacity .15s; }   /* spring response .3s */
 .draw { stroke-dasharray: 1; animation: draw .75s var(--ease) backwards; }   /* line traces left to right when new data is shown */
 @keyframes draw { from { stroke-dashoffset: 1; } }
+.reveal { animation: reveal .75s var(--ease) backwards; }   /* sparklines: dashes ignore pathLength under non-scaling-stroke, so wipe the box instead */
+@keyframes reveal { from { clip-path: inset(-4px 100% -4px -4px); } to { clip-path: inset(-4px -4px -4px -4px); } }
 .draw ~ .end { animation: fade .3s .55s backwards; }   /* the latest-point dot lands as the line finishes */
 .swap { animation: swap .32s var(--ease); }                                  /* headline comes into focus when the indicator changes */
 @keyframes swap { from { opacity: 0; filter: blur(5px); } }
 .dot.pulse { animation: pulse 1s ease-out; }                                 /* one ring when an update lands */
 @keyframes pulse { from { box-shadow: 0 0 0 0 rgba(27,175,122,.55); } to { box-shadow: 0 0 0 9px rgba(27,175,122,0); } }
 @keyframes fade { from { opacity: 0; } }
+.nw { white-space: nowrap; }   /* "12-month" wraps as a word, never at its hyphen */
 .seg button[disabled] { opacity: .35; cursor: default; }
 @media (pointer: coarse) { .seg button { min-height: 44px; } .btn { min-height: 44px; } }
 .dates { display: inline-flex; align-items: center; gap: 6px; font-size: .8125rem; color: var(--text-2); margin-left: auto; }
@@ -106,7 +109,7 @@ button, summary { touch-action: manipulation; -webkit-user-select: none; user-se
 main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; padding: 20px 0 48px; align-items: start; }
 @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 22px; }
-#focus { position: sticky; top: 68px; scroll-margin-top: 68px; }
+#focus { position: sticky; top: calc(var(--bar-h, 56px) + 12px); scroll-margin-top: calc(var(--bar-h, 56px) + 12px); }   /* --bar-h tracks the bar as it wraps */
 .sheetbar, #scrim, #presets2, #presets [data-k="Custom"] { display: none; }   /* phone-only pieces */
 @media (max-width: 960px) { #focus { position: static; } }
 #f-name { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; margin: 0 0 2px; text-wrap: balance; }
@@ -234,7 +237,7 @@ footer { color: var(--text-2); font-size: .75rem; padding: 0 0 40px; }
 @media (prefers-reduced-motion: reduce) {  /* no travel or scaling; keep short fades so changes still register */
   .thumb.ready { transition: opacity .15s; }
   .btn:active, .card:active { transform: none; }
-  .draw { stroke-dasharray: none; animation: fade .2s backwards; }
+  .draw, .reveal { stroke-dasharray: none; animation: fade .2s backwards; }
   .swap { animation: fade .2s; }
   .dot.pulse { animation: none; }
   .ping, .sdot::after { animation: none; opacity: 0; }   /* the dot stays, the pulse goes */
@@ -460,7 +463,7 @@ function pathOf(d, v, X, Y) {
 }
 const charts = [];                       // live chart handles for the synced crosshair
 function drawChart(host, s, color, dec, band, anim) {
-  const W = host.clientWidth || 600, H = W > 560 ? 300 : 220, L = 8, R = 46, T = 10, B = 22;
+  const W = host.clientWidth || 600, H = W > 560 ? 300 : 220, L = 8, R = 52, T = 10, B = 22;   // R leaves room for the latest-point pulse before the axis labels
   if (!s.d.length) { host.innerHTML = '<p class="sub">No observations in this date range.</p>'; return null; }
   let lo = Math.min(...s.v), hi = Math.max(...s.v);
   if (band) for (const [, c, tol] of band) { lo = Math.min(lo, c - tol); hi = Math.max(hi, c + tol); }
@@ -470,7 +473,7 @@ function drawChart(host, s, color, dec, band, anim) {
   const { t: yt, step } = niceTicks(lo, hi);
   const tdec = Math.max(0, Math.min(4, -Math.floor(Math.log10(step) + 1e-9)));
   let g = '';
-  for (const y of yt) g += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--grid)"/><text x="${W - R + 6}" y="${Y(y) + 4}">${fmt(y, tdec)}</text>`;
+  for (const y of yt) g += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--grid)"/><text x="${W - R + 14}" y="${Y(y) + 4}">${fmt(y, tdec)}</text>`;
   if (lo < 0 && hi > 0) g += `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--text-2)" stroke-width="1"/>`;
   const y0 = new Date(x0).getUTCFullYear(), y1 = new Date(x1).getUTCFullYear(), every = Math.ceil((y1 - y0 + 1) / Math.max(2, Math.floor(W / 70)));
   if (y1 - y0 >= 2) { for (let y = y0 + 1; y <= y1; y += every) { const px = X(Date.UTC(y, 0, 1)); if (px > L + 12 && px < W - R - 12) g += `<text x="${px}" y="${H - 5}" text-anchor="middle">${y}</text>`; } }
@@ -509,9 +512,9 @@ function spark(s) {
   for (let i = 0; i < s.d.length; i += stride) pts += `${((s.d[i] - x0) / (x1 - x0) * 100).toFixed(1)},${(33 - (s.v[i] - lo) / (hi - lo || 1) * 30).toFixed(1)} `;
   const yEnd = 33 - (s.v[s.v.length - 1] - lo) / (hi - lo || 1) * 30;
   pts += `100,${yEnd.toFixed(1)}`;
-  const delay = Math.min(sparkN++ * 18, 320), intro = booting ? `class="draw" pathLength="1" style="animation-delay:${delay}ms"` : '';
+  const delay = Math.min(sparkN++ * 18, 320), intro = booting ? `class="reveal" style="animation-delay:${delay}ms"` : '';
   const dotIn = booting ? `;animation:fade .3s ${delay + 550}ms backwards` : '';   // on first load the dot waits for its line
-  return `<span class="sp"><i class="sdot" style="top:${(yEnd / 36 * 100).toFixed(1)}%${dotIn}"></i><svg viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><path d="M${pts.trim().split(' ').join('L')}" ${intro} fill="none" stroke="var(--series-1)" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></span>`;
+  return `<span class="sp"><i class="sdot" style="top:${(yEnd / 36 * 100).toFixed(1)}%${dotIn}"></i><svg viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true" ${intro}><path d="M${pts.trim().split(' ').join('L')}" fill="none" stroke="var(--series-1)" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></span>`;
 }
 
 // ---------- render ----------
@@ -551,7 +554,7 @@ function renderCards() {
     if (m.cat !== cat) { cat = m.cat; html += `<h2 class="cat">${cat}</h2>`; }
     const c = changes(m.id), w = windowed(S[m.id], 'level'), dd = Math.max(m.dec, 1) > 2 ? 2 : Math.max(m.dec, 1);
     html += `<button class="card" data-id="${m.id}" aria-pressed="${m.id === state.sel}">
-      <span class="n" title="${m.name}">${m.name}</span>
+      <span class="n" title="${m.name}">${m.name.replace(/\S+-\S+/g, w => `<span class="nw">${w}</span>`)}</span>
       <span class="v">${fmt(c.last, m.dec)}<small>${m.unit}</small></span>
       <span class="m"><span class="nw dt">${fmtDate(c.date, m.freq)}</span>${c.yoy == null ? '' : `<span class="sep"> · </span><span class="nw d">${signed(c.yoy, dd)}${c.u} vs 1y</span>`}</span>
       ${spark(w)}</button>`;
@@ -711,6 +714,7 @@ function selfTest() {
 }
 function boot() {
   selfTest();
+  const bar = document.querySelector('.bar'); new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px')).observe(bar);
   for (const [id, obs] of Object.entries(window.SEED.series)) raw[id] = obs.map(([d, v]) => [parseIso(d), v]);
   if (window.SEED_US) { usFetchedAt = window.SEED_US.fetchedAt;   // an empty snapshot must not switch the US tab on
     for (const [id, obs] of Object.entries(window.SEED_US.series)) if (BY_ID[id] && obs.length) { raw[id] = obs.map(([d, v]) => [parseIso(d), v]); hasUS = true; } }
