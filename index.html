@@ -58,6 +58,7 @@ button, summary { touch-action: manipulation; -webkit-user-select: none; user-se
   transition: transform .1s ease-out, opacity .2s;
 }
 .btn:active { transform: scale(.97); }
+.btn.off { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; } /* keeps its space so the header doesn't jump */
 .btn[disabled] { opacity: .6; cursor: default; }
 .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: spin .8s linear infinite; display: none; }
 .btn[disabled] .spin { display: block; }
@@ -538,9 +539,9 @@ function renderHeader() {
   const when = us ? usFetchedAt : fetchedAt;
   $('through').textContent = fmtDate(Math.max(...ends), 'D');
   $('fetched').textContent = when ? new Date(when).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
-  $('origin').textContent = us ? '· refreshed daily from FRED' : live ? '· live from BCB' : '· bundled snapshot';
+  $('origin').textContent = us ? '· daily from FRED' : live ? '· live from BCB' : '· bundled snapshot';
   $('dot').className = 'dot' + (us || live ? ' live' : '');
-  $('update').hidden = us;
+  $('update').classList.toggle('off', us);
 }
 function renderCards() {
   let html = '', cat = '';
